@@ -1,0 +1,29 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment variables
+.env
+.env.*
+
+# Logs and runtime artifacts
+logs/
+*.log
+
+# Vector database and local index artifacts
+rag/chroma_db/
+rag/md5.text
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db
