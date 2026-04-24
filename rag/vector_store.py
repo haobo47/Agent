@@ -26,6 +26,23 @@ class VectorStoreService:
     def get_retriever(self):
         return self.vector_store.as_retriever(search_kwargs={"k": chroma_config["k"]})
 
+    def get_vector_docs(self, query: str, top_k: int | None = None) -> list[Document]:
+        k = top_k if top_k and top_k > 0 else chroma_config["k"]
+        return self.vector_store.similarity_search(query=query, k=k)
+
+    def get_all_vector_docs(self) -> list[Document]:
+        data = self.vector_store.get(include=["documents", "metadatas"])
+        documents = data.get("documents", []) or []
+        metadatas = data.get("metadatas", []) or []
+
+        result: list[Document] = []
+        for index, content in enumerate(documents):
+            if not content:
+                continue
+            metadata = metadatas[index] if index < len(metadatas) and metadatas[index] else {}
+            result.append(Document(page_content=content, metadata=metadata))
+        return result
+
     def load_document(self):
         """
         从数据文件夹中读取数据文件，转为向量存入向量库

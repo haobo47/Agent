@@ -1,2 +1,18 @@
 chat_model_name: qwen3-max
 embedding_model_name: text-embedding-v4
+
+retrieval:
+  vector_top_k: 8
+  bm25_top_k: 8
+  fusion_top_k: 16
+  bm25_tokenizer: jieba
+  bert_tokenizer_model: bert-base-chinese
+  bm25_min_token_len: 2
+  bm25_stopwords_path: config/stopwords_zh.txt
+
+rerank:
+  enabled: true
+  model_name: gte-rerank-v2
+  top_n: 5
+  batch_size: 12
+  strict_mode: true
