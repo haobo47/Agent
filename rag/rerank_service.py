@@ -1,9 +1,7 @@
-import time
-from http import HTTPStatus
-
-import dashscope
 from langchain_core.documents import Document
 
+from model.factory import rerank_model
+from rag.hybrid_retriever import HybridRetriever
 from utils.config_handler import rag_config
 from utils.logger_handler import logger
 
@@ -11,75 +9,61 @@ from utils.logger_handler import logger
 class RerankService:
     def __init__(self):
         rerank_cfg = rag_config.get("rerank", {})
-        self.enabled = bool(rerank_cfg.get("enabled", False))
-        self.model_name = str(rerank_cfg.get("model_name", ""))
         self.top_n = int(rerank_cfg.get("top_n", 5))
-        self.batch_size = int(rerank_cfg.get("batch_size", 12))
-        self.strict_mode = bool(rerank_cfg.get("strict_mode", True))
+        self.hybrid_retriever = HybridRetriever()
+        self.rerank_model = rerank_model
 
-    def rerank(self, query: str, docs: list[Document]) -> list[Document]:
+    def rerank(self, query: str) -> list[Document]:
+        docs = self.hybrid_retriever.retrieve(query)
+
         if not docs:
             return []
 
-        if not self.enabled:
-            return docs[: self.top_n]
-
-        candidates = docs[: self.batch_size]
-        documents = [doc.page_content for doc in candidates]
-        started = time.perf_counter()
+        if self.rerank_model is None:
+            raise RuntimeError("[RerankService]未初始化重排模型")
 
         try:
-            response = dashscope.TextReRank.call(
-                model=self.model_name,
+            reranked_docs = self.rerank_model.compress_documents(
+                documents=docs,
                 query=query,
-                documents=documents,
-                top_n=min(self.top_n, len(documents)),
-                return_documents=False,
             )
         except Exception as exc:
             logger.error(f"[RerankService]重排模型调用失败: {exc}", exc_info=True)
-            if self.strict_mode:
-                raise
-            return candidates[: self.top_n]
-
-        status_code = getattr(response, "status_code", None)
-        if status_code != HTTPStatus.OK:
-            msg = f"[RerankService]重排失败, 状态码={status_code}, 消息={getattr(response, 'message', '')}"
-            logger.error(msg)
-            if self.strict_mode:
-                raise RuntimeError(msg)
-            return candidates[: self.top_n]
-
-        output = getattr(response, "output", None)
-        results = getattr(output, "results", None)
-        if not results:
-            msg = "[RerankService]重排返回结果为空"
-            logger.error(msg)
-            if self.strict_mode:
-                raise RuntimeError(msg)
-            return candidates[: self.top_n]
-
-        reranked_docs: list[Document] = []
-        for item in results:
-            index = getattr(item, "index", None)
-            score = float(getattr(item, "relevance_score", 0.0))
-            if index is None or index >= len(candidates):
-                continue
-            source_doc = candidates[index]
-            metadata = dict(source_doc.metadata or {})
-            metadata["rank_score"] = score
-            reranked_docs.append(
-                Document(page_content=source_doc.page_content, metadata=metadata))
-
-        logger.info(
-            f"[RerankService]候选文档数={len(candidates)}, 重排后文档数={len(reranked_docs)}, 耗时={(time.perf_counter() - started) * 1000:.2f}"
-        )
+            raise
 
         if not reranked_docs:
-            msg = "[RerankService]重排未能映射任何结果索引"
+            msg = "[RerankService]重排返回结果为空"
             logger.error(msg)
-            if self.strict_mode:
-                raise RuntimeError(msg)
-            return candidates[: self.top_n]
+            raise RuntimeError(msg)
+
+        reranked_docs = list(reranked_docs)
+        for doc in reranked_docs:
+            metadata = dict(doc.metadata or {})
+            if "relevance_score" in metadata:
+                metadata["rank_score"] = float(metadata["relevance_score"])
+            doc.metadata = metadata
+
+        logger.info(
+            f"[RerankService]候选文档数={len(docs)}, 重排后文档数={len(reranked_docs)}"
+        )
 
         return reranked_docs
+
+
+if __name__ == "__main__":
+    query = "机器人开机没反应怎么回事？"
+
+    service = RerankService()
+    try:
+        reranked = service.rerank(query)
+        print(f"query: {query}")
+        print(f"重排后数量: {len(reranked)}")
+        for index, doc in enumerate(reranked, start=1):
+            metadata = doc.metadata or {}
+            print(f"结果{index}:")
+            print(f"source: {metadata.get('source', '')}")
+            rank_score = metadata.get("rank_score", "")
+            print(f"rank_score: {rank_score}")
+            print(doc.page_content)
+    except Exception as exc:
+        print(f"重排测试失败: {exc}")

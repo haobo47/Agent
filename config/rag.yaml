@@ -11,8 +11,5 @@ retrieval:
   bm25_stopwords_path: config/stopwords_zh.txt
 
 rerank:
-  enabled: true
   model_name: gte-rerank-v2
   top_n: 5
-  batch_size: 12
-  strict_mode: true

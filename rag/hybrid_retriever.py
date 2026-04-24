@@ -15,8 +15,8 @@ from utils.path_tool import get_abs_path
 
 
 class HybridRetriever:
-    def __init__(self, vector_store: VectorStoreService):
-        self.vector_store = vector_store
+    def __init__(self, vector_store: VectorStoreService | None = None):
+        self.vector_store = vector_store if vector_store is not None else VectorStoreService()
         retrieval_cfg = rag_config["retrieval"]
 
         self.vector_top_k = int(retrieval_cfg["vector_top_k"])
@@ -40,7 +40,7 @@ class HybridRetriever:
             doc.metadata = dict(doc.metadata or {})
             doc.metadata["retriever"] = "vector"
 
-        bm25_docs = self.retrieve_bm25(query=query, top_k=self.bm25_top_k)
+        bm25_docs = self.retrieve_bm25(query, self.bm25_top_k)
         merged_docs = self.merge_and_dedup(vector_docs, bm25_docs)
         merged_docs = merged_docs[: self.fusion_top_k]
 
@@ -227,7 +227,7 @@ class HybridRetriever:
 
 
 if __name__ == "__main__":
-    service = HybridRetriever(VectorStoreService())
+    service = HybridRetriever()
     query = "机器人开机没反应指示灯不亮怎么回事？"
     docs = service.retrieve(query)
     print(f"query: {query}")
