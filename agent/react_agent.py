@@ -16,12 +16,26 @@ class ReactAgent:
             middleware=[monitor_tool, log_before_model, report_prompt_switch],
         )
 
-    def execute_stream(self, query: str):
-        input_dict = {
-            "messages": [
+    def execute_stream(self, query: str, history_messages: list[dict[str, str]] | None = None):
+        # 默认兼容旧调用；传入历史消息时，使用完整会话作为模型输入。
+        if history_messages:
+            input_messages = [
+                {
+                    "role": str(msg.get("role", "")).strip(),
+                    "content": str(msg.get("content", "")),
+                }
+                for msg in history_messages
+                if msg.get("role") and msg.get("content")
+            ]
+        else:
+            input_messages = [
                 {"role": "user", "content": query},
             ]
+
+        input_dict = {
+            "messages": input_messages
         }
+
         for chunk in self.agent.stream(input_dict, stream_mode="values",
                                        context={"report": False}):
             latest_message = chunk["messages"][-1]

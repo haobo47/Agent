@@ -1,3 +1,5 @@
+from agent.react_agent import ReactAgent
+import streamlit as st
 import os
 import time
 import warnings
@@ -9,8 +11,6 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
-import streamlit as st
-from agent.react_agent import ReactAgent
 
 # title
 st.title("扫地机器人智能客服")
@@ -35,7 +35,10 @@ if prompt:
     response_messages = []
     # 生成回复
     with st.spinner("客服思考中..."):
-        res = st.session_state["agent"].execute_stream(prompt)
+        res = st.session_state["agent"].execute_stream(
+            prompt,
+            history_messages=st.session_state["messages"],
+        )
 
         def capture(generator, cache_list):
             for chunk in generator:
