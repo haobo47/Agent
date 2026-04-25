@@ -1,4 +1,13 @@
+import os
 import time
+import warnings
+
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API.*",
+    category=UserWarning,
+)
 
 import streamlit as st
 from agent.react_agent import ReactAgent
